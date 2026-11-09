@@ -1,0 +1,6 @@
+{
+  "name": "Hystérésis Excellence Manager",
+  "description": "Plateforme officielle de gestion, suivi et valorisation des lauréats de la Fondation Hystérésis pour la Journée de l'Excellence en milieu scolaire (éditions 2022 à 2026+).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
