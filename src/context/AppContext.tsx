@@ -485,7 +485,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
       console.error('Google Sign-In error:', err);
-      setAuthError(err?.message || 'Erreur lors de la connexion Google.');
+      const code = err?.code as string | undefined;
+      if (code === 'auth/unauthorized-domain') {
+        const host = typeof window !== 'undefined' ? window.location.hostname : '';
+        setAuthError(
+          `UNAUTHORIZED_DOMAIN:${host}`
+        );
+      } else if (code === 'auth/popup-closed-by-user') {
+        setAuthError('La fenêtre de connexion Google a été fermée avant la fin de l’authentification.');
+      } else if (code === 'auth/popup-blocked') {
+        setAuthError('Le navigateur a bloqué la fenêtre de connexion Google. Veuillez autoriser les fenêtres contextuelles pour ce site.');
+      } else {
+        setAuthError(err?.message || 'Erreur lors de la connexion Google.');
+      }
     }
   };
 
