@@ -1,0 +1,434 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Verrou global par défaut (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================
+    // PRIMITIVES GLOBALES DE SÉCURITÉ
+    // =========================================================
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'fhysteresis@gmail.com';
+    }
+
+    function hasUserDoc() {
+      return isVerifiedUser() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerifiedUser() && (
+          exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+          (hasUserDoc() && getUserDoc().status == 'active' && getUserDoc().role == 'admin')
+        )
+      );
+    }
+
+    function isActiveUser() {
+      return isAdmin() || (
+        hasUserDoc() &&
+        getUserDoc().status == 'active' &&
+        getUserDoc().role in ['admin', 'manager', 'club_lead', 'partner']
+      );
+    }
+
+    function isManager() {
+      return isAdmin() || (
+        isActiveUser() &&
+        getUserDoc().role in ['admin', 'manager']
+      );
+    }
+
+    function isClubLead() {
+      return isManager() || (
+        isActiveUser() &&
+        getUserDoc().role == 'club_lead'
+      );
+    }
+
+    function emailKey(email) {
+      return email.lower().replace('[^a-z0-9_\\-]', '_');
+    }
+
+    function hasValidInvite(email) {
+      return email is string &&
+        exists(/databases/$(database)/documents/role_invites/$(emailKey(email)));
+    }
+
+    function getInvite(email) {
+      return get(/databases/$(database)/documents/role_invites/$(emailKey(email))).data;
+    }
+
+    // =========================================================
+    // VALIDATEURS DE SCHÉMA (ANTI-UPDATE-GAP)
+    // =========================================================
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'clubCommune', 'createdAt', 'updatedAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 150 &&
+        data.role in ['admin', 'manager', 'club_lead', 'partner', 'pending'] &&
+        data.status in ['active', 'pending', 'revoked'] &&
+        (!('clubCommune' in data) || (data.clubCommune is string && data.clubCommune.size() <= 80)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['uid', 'email', 'grantedBy', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'grantedBy', 'createdAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+        data.grantedBy is string && data.grantedBy.size() >= 1 && data.grantedBy.size() <= 128 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidRoleInvite(data) {
+      return data.keys().hasAll(['email', 'role', 'invitedBy', 'createdAt']) &&
+        data.keys().hasOnly(['email', 'role', 'clubCommune', 'invitedBy', 'createdAt']) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+        data.role in ['admin', 'manager', 'club_lead', 'partner'] &&
+        (!('clubCommune' in data) || (data.clubCommune is string && data.clubCommune.size() <= 80)) &&
+        data.invitedBy is string && data.invitedBy.size() >= 1 && data.invitedBy.size() <= 128 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidLaureatStats(data) {
+      return data.keys().hasAll([
+          'id', 'sexe', 'edition', 'examen', 'commune', 'departement',
+          'etablissement', 'typeEtablissement', 'moyenne', 'rang',
+          'ordinateurRecu', 'tabletteRecue', 'bourseRecue',
+          'statutActuel', 'orientationStem', 'participationClub',
+          'statutRelance', 'statutFiche', 'tauxCompletude',
+          'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'numeroOrigine', 'initiales', 'sexe', 'edition', 'examen',
+          'commune', 'departement', 'etablissement', 'typeEtablissement',
+          'moyenne', 'rang', 'serie', 'mention', 'moyenneEntreeSixieme',
+          'ordinateurRecu', 'tabletteRecue', 'bourseRecue',
+          'statutActuel', 'orientationStem', 'participationClub',
+          'clubCommune', 'clubNiveau', 'roleClub', 'statutRelance',
+          'statutFiche', 'tauxCompletude', 'parcoursLiesIds',
+          'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        (!('numeroOrigine' in data) || (data.numeroOrigine is int && data.numeroOrigine >= 0 && data.numeroOrigine <= 100000)) &&
+        (!('initiales' in data) || (data.initiales is string && data.initiales.size() <= 20)) &&
+        data.sexe in ['F', 'M'] &&
+        data.edition is int && data.edition >= 2020 && data.edition <= 2100 &&
+        data.examen in ['CEP', 'BEPC', 'BAC', 'Autre'] &&
+        data.commune is string && data.commune.size() >= 1 && data.commune.size() <= 80 &&
+        data.departement is string && data.departement.size() >= 1 && data.departement.size() <= 80 &&
+        data.etablissement is string && data.etablissement.size() >= 1 && data.etablissement.size() <= 200 &&
+        data.typeEtablissement in ['Public', 'Privé', 'Militaire'] &&
+        data.moyenne is number && data.moyenne >= 0 && data.moyenne <= 20 &&
+        data.rang is string && data.rang.size() >= 1 && data.rang.size() <= 60 &&
+        (!('serie' in data) || (data.serie is string && data.serie.size() <= 50)) &&
+        (!('mention' in data) || (data.mention is string && data.mention.size() <= 50)) &&
+        (!('moyenneEntreeSixieme' in data) || (data.moyenneEntreeSixieme is number && data.moyenneEntreeSixieme >= 0 && data.moyenneEntreeSixieme <= 20)) &&
+        data.ordinateurRecu is bool &&
+        data.tabletteRecue is bool &&
+        data.bourseRecue is bool &&
+        data.statutActuel in ['Élève', 'Étudiant(e)', 'Salarié(e)', 'Entrepreneur(e)', 'En recherche', 'Inconnu'] &&
+        data.orientationStem in ['Oui', 'Non', 'Inconnue'] &&
+        data.participationClub is bool &&
+        (!('clubCommune' in data) || (data.clubCommune is string && data.clubCommune.size() <= 80)) &&
+        (!('clubNiveau' in data) || data.clubNiveau in ['3ème', 'Seconde', 'Première', 'Terminale']) &&
+        (!('roleClub' in data) || data.roleClub in ['Membre', 'Jeune Instructrice', 'Déléguée', 'Responsable']) &&
+        data.statutRelance in ['À jour', 'À relancer', 'Sans contact', 'Traité'] &&
+        data.statutFiche in ['Active', 'À vérifier', 'Archivée'] &&
+        data.tauxCompletude is int && data.tauxCompletude >= 0 && data.tauxCompletude <= 100 &&
+        (!('parcoursLiesIds' in data) || (
+          data.parcoursLiesIds is list &&
+          data.parcoursLiesIds.size() <= 10 &&
+          (data.parcoursLiesIds.size() == 0 || data.parcoursLiesIds[0] is string)
+        )) &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidLaureatPrivate(data) {
+      return data.keys().hasAll([
+          'id', 'nom', 'prenoms', 'consentementDonnees',
+          'autorisationPublicationPhoto', 'sourceInformation',
+          'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'nom', 'prenoms', 'dateNaissance', 'lieuNaissance', 'photoUrl',
+          'telephone', 'telephoneLibelle', 'contactsSecondaires', 'email',
+          'contactUrgence', 'arrondissement', 'numeroTable', 'remarquesScolaires',
+          'certificatReference', 'naturePrix', 'accompagnementRecu', 'dateRemise',
+          'lieuRemise', 'partenaireAssocie', 'observationRecompense',
+          'etablissementActuel', 'filiereActuelle', 'communeActuelle',
+          'dateDernierContact', 'motifRelance', 'prochaineAction',
+          'responsableSuivi', 'mentorAttribue', 'derniereActiviteSuivie',
+          'besoinsActuels', 'projetProfessionnel', 'difficultesRencontrees',
+          'commentairesSuivi', 'clubEtablissement', 'projetsRealises',
+          'participationHackathon', 'utilisateurCreation', 'utilisateurModification',
+          'sourceInformation', 'consentementDonnees', 'autorisationPublicationPhoto',
+          'notesInternes', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.nom is string && data.nom.size() >= 1 && data.nom.size() <= 120 &&
+        data.prenoms is string && data.prenoms.size() >= 1 && data.prenoms.size() <= 160 &&
+        (!('dateNaissance' in data) || (data.dateNaissance is string && data.dateNaissance.size() <= 30)) &&
+        (!('lieuNaissance' in data) || (data.lieuNaissance is string && data.lieuNaissance.size() <= 120)) &&
+        (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+        (!('telephone' in data) || (data.telephone is string && data.telephone.size() <= 60)) &&
+        (!('telephoneLibelle' in data) || (data.telephoneLibelle is string && data.telephoneLibelle.size() <= 60)) &&
+        (!('contactsSecondaires' in data) || (
+          data.contactsSecondaires is list &&
+          data.contactsSecondaires.size() <= 10 &&
+          (data.contactsSecondaires.size() == 0 || data.contactsSecondaires[0] is map)
+        )) &&
+        (!('email' in data) || (data.email is string && data.email.size() <= 200)) &&
+        (!('contactUrgence' in data) || (data.contactUrgence is string && data.contactUrgence.size() <= 160)) &&
+        (!('arrondissement' in data) || (data.arrondissement is string && data.arrondissement.size() <= 100)) &&
+        (!('numeroTable' in data) || (data.numeroTable is string && data.numeroTable.size() <= 50)) &&
+        (!('remarquesScolaires' in data) || (data.remarquesScolaires is string && data.remarquesScolaires.size() <= 500)) &&
+        (!('certificatReference' in data) || (data.certificatReference is string && data.certificatReference.size() <= 100)) &&
+        (!('naturePrix' in data) || (data.naturePrix is string && data.naturePrix.size() <= 200)) &&
+        (!('accompagnementRecu' in data) || (data.accompagnementRecu is string && data.accompagnementRecu.size() <= 200)) &&
+        (!('dateRemise' in data) || (data.dateRemise is string && data.dateRemise.size() <= 40)) &&
+        (!('lieuRemise' in data) || (data.lieuRemise is string && data.lieuRemise.size() <= 150)) &&
+        (!('partenaireAssocie' in data) || (data.partenaireAssocie is string && data.partenaireAssocie.size() <= 150)) &&
+        (!('observationRecompense' in data) || (data.observationRecompense is string && data.observationRecompense.size() <= 400)) &&
+        (!('etablissementActuel' in data) || (data.etablissementActuel is string && data.etablissementActuel.size() <= 200)) &&
+        (!('filiereActuelle' in data) || (data.filiereActuelle is string && data.filiereActuelle.size() <= 150)) &&
+        (!('communeActuelle' in data) || (data.communeActuelle is string && data.communeActuelle.size() <= 100)) &&
+        (!('dateDernierContact' in data) || (data.dateDernierContact is string && data.dateDernierContact.size() <= 40)) &&
+        (!('motifRelance' in data) || (data.motifRelance is string && data.motifRelance.size() <= 300)) &&
+        (!('prochaineAction' in data) || (data.prochaineAction is string && data.prochaineAction.size() <= 300)) &&
+        (!('responsableSuivi' in data) || (data.responsableSuivi is string && data.responsableSuivi.size() <= 120)) &&
+        (!('mentorAttribue' in data) || (data.mentorAttribue is string && data.mentorAttribue.size() <= 120)) &&
+        (!('derniereActiviteSuivie' in data) || (data.derniereActiviteSuivie is string && data.derniereActiviteSuivie.size() <= 200)) &&
+        (!('besoinsActuels' in data) || (data.besoinsActuels is string && data.besoinsActuels.size() <= 400)) &&
+        (!('projetProfessionnel' in data) || (data.projetProfessionnel is string && data.projetProfessionnel.size() <= 400)) &&
+        (!('difficultesRencontrees' in data) || (data.difficultesRencontrees is string && data.difficultesRencontrees.size() <= 400)) &&
+        (!('commentairesSuivi' in data) || (data.commentairesSuivi is string && data.commentairesSuivi.size() <= 600)) &&
+        (!('clubEtablissement' in data) || (data.clubEtablissement is string && data.clubEtablissement.size() <= 200)) &&
+        (!('projetsRealises' in data) || (data.projetsRealises is string && data.projetsRealises.size() <= 400)) &&
+        (!('participationHackathon' in data) || data.participationHackathon is bool) &&
+        (!('utilisateurCreation' in data) || (data.utilisateurCreation is string && data.utilisateurCreation.size() <= 120)) &&
+        (!('utilisateurModification' in data) || (data.utilisateurModification is string && data.utilisateurModification.size() <= 120)) &&
+        data.sourceInformation is string && data.sourceInformation.size() <= 200 &&
+        data.consentementDonnees is bool &&
+        data.autorisationPublicationPhoto is bool &&
+        (!('notesInternes' in data) || (data.notesInternes is string && data.notesInternes.size() <= 2000)) &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidClub(data) {
+      return data.keys().hasAll(['id', 'nom', 'commune', 'etablissement', 'anneeCreation', 'capaciteMax', 'maxParNiveau']) &&
+        data.keys().hasOnly(['id', 'nom', 'commune', 'etablissement', 'anneeCreation', 'responsableNom', 'responsableContact', 'capaciteMax', 'maxParNiveau', 'description', 'createdAt', 'updatedAt']) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.nom is string && data.nom.size() >= 2 && data.nom.size() <= 150 &&
+        data.commune is string && data.commune.size() >= 2 && data.commune.size() <= 80 &&
+        data.etablissement is string && data.etablissement.size() >= 1 && data.etablissement.size() <= 200 &&
+        data.anneeCreation is int && data.anneeCreation >= 2020 && data.anneeCreation <= 2100 &&
+        (!('responsableNom' in data) || (data.responsableNom is string && data.responsableNom.size() <= 120)) &&
+        (!('responsableContact' in data) || (data.responsableContact is string && data.responsableContact.size() <= 60)) &&
+        data.capaciteMax is int && data.capaciteMax >= 1 && data.capaciteMax <= 12 &&
+        data.maxParNiveau is int && data.maxParNiveau >= 1 && data.maxParNiveau <= 3 &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 500)) &&
+        (!('createdAt' in data) || data.createdAt is timestamp) &&
+        (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidActivityLog(data) {
+      return data.keys().hasAll(['id', 'timestamp', 'utilisateur', 'userId', 'action', 'entite', 'details']) &&
+        data.keys().hasOnly(['id', 'timestamp', 'utilisateur', 'userId', 'action', 'entite', 'details']) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.timestamp is timestamp &&
+        data.utilisateur is string && data.utilisateur.size() >= 1 && data.utilisateur.size() <= 120 &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.action in ['CREATION', 'MODIFICATION', 'SUPPRESSION', 'IMPORT', 'EXPORT', 'FUSION_DOUBLON', 'ADMIN_ROLE'] &&
+        data.entite is string && data.entite.size() >= 1 && data.entite.size() <= 160 &&
+        data.details is string && data.details.size() >= 1 && data.details.size() <= 500;
+    }
+
+    // =========================================================
+    // RÈGLES PAR COLLECTION
+    // =========================================================
+
+    // 1. Profils utilisateurs (PII restreinte au propriétaire ou à l'administrateur)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isValidId(userId) && isVerifiedUser() && isValidUserProfile(incoming()) && (
+        (isOwner(userId) && isBootstrappedAdmin() && incoming().uid == request.auth.uid && incoming().role == 'admin' && incoming().status == 'active' && incoming().createdAt == request.time && incoming().updatedAt == request.time) ||
+        (isOwner(userId) && incoming().uid == request.auth.uid && incoming().email == request.auth.token.email && hasValidInvite(request.auth.token.email) && incoming().role == getInvite(request.auth.token.email).role && incoming().status == 'active' && incoming().createdAt == request.time && incoming().updatedAt == request.time) ||
+        (isOwner(userId) && incoming().uid == request.auth.uid && incoming().email == request.auth.token.email && incoming().role == 'pending' && incoming().status == 'pending' && incoming().createdAt == request.time && incoming().updatedAt == request.time) ||
+        (isAdmin() && incoming().createdAt == request.time && incoming().updatedAt == request.time)
+      );
+
+      allow update: if isValidId(userId) && isVerifiedUser() && isValidUserProfile(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'status', 'clubCommune', 'displayName', 'updatedAt'])) ||
+          (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // 2. Registre des administrateurs
+    match /admins/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(userId) && isAdmin() && isValidAdminRecord(incoming()) && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // 3. Invitations nominatives pré-approuvées par l'administrateur
+    match /role_invites/{inviteId} {
+      allow get: if isValidId(inviteId) && isVerifiedUser() && (
+        isAdmin() ||
+        inviteId == emailKey(request.auth.token.email)
+      );
+      allow list: if isAdmin();
+      allow create: if isValidId(inviteId) && isAdmin() && isValidRoleInvite(incoming()) && inviteId == emailKey(incoming().email) && incoming().invitedBy == request.auth.uid && incoming().createdAt == request.time;
+      allow update: if isValidId(inviteId) && isAdmin() && isValidRoleInvite(incoming()) && incoming().email == existing().email && incoming().createdAt == existing().createdAt && incoming().invitedBy == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'clubCommune', 'invitedBy']);
+      allow delete: if isValidId(inviteId) && isAdmin();
+    }
+
+    // 4. Données statistiques des lauréats (Non-PII — accessibles aux utilisateurs actifs)
+    match /laureats_stats/{laureatId} {
+      allow get: if isValidId(laureatId) && isActiveUser();
+      allow list: if isActiveUser();
+
+      allow create: if isValidId(laureatId) && isManager() && isValidLaureatStats(incoming()) &&
+        incoming().id == laureatId &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(laureatId) && isValidLaureatStats(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (isManager() && incoming().diff(existing()).affectedKeys().hasOnly([
+            'numeroOrigine', 'initiales', 'sexe', 'edition', 'examen', 'commune',
+            'departement', 'etablissement', 'typeEtablissement', 'moyenne', 'rang',
+            'serie', 'mention', 'moyenneEntreeSixieme', 'ordinateurRecu',
+            'tabletteRecue', 'bourseRecue', 'statutActuel', 'orientationStem',
+            'participationClub', 'clubCommune', 'clubNiveau', 'roleClub',
+            'statutRelance', 'statutFiche', 'tauxCompletude', 'parcoursLiesIds', 'updatedAt'
+          ])) ||
+          (isClubLead() && incoming().diff(existing()).affectedKeys().hasOnly([
+            'participationClub', 'clubCommune', 'clubNiveau', 'roleClub', 'updatedAt'
+          ]))
+        );
+
+      allow delete: if isValidId(laureatId) && isAdmin();
+    }
+
+    // 5. Données personnelles sensibles (PII) — STRICTEMENT bloquées pour Partenaires, Responsables de club et Pending
+    match /laureats_private/{laureatId} {
+      allow get: if isValidId(laureatId) && isManager();
+      allow list: if isManager();
+
+      allow create: if isValidId(laureatId) && isManager() && isValidLaureatPrivate(incoming()) &&
+        incoming().id == laureatId &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        existsAfter(/databases/$(database)/documents/laureats_stats/$(laureatId));
+
+      allow update: if isValidId(laureatId) && isManager() && isValidLaureatPrivate(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'nom', 'prenoms', 'dateNaissance', 'lieuNaissance', 'photoUrl',
+            'telephone', 'telephoneLibelle', 'contactsSecondaires', 'email',
+            'contactUrgence', 'arrondissement', 'numeroTable', 'remarquesScolaires',
+            'certificatReference', 'naturePrix', 'accompagnementRecu', 'dateRemise',
+            'lieuRemise', 'partenaireAssocie', 'observationRecompense',
+            'etablissementActuel', 'filiereActuelle', 'communeActuelle',
+            'dateDernierContact', 'motifRelance', 'prochaineAction',
+            'responsableSuivi', 'mentorAttribue', 'derniereActiviteSuivie',
+            'besoinsActuels', 'projetProfessionnel', 'difficultesRencontrees',
+            'commentairesSuivi', 'clubEtablissement', 'projetsRealises',
+            'participationHackathon', 'utilisateurModification', 'sourceInformation',
+            'consentementDonnees', 'autorisationPublicationPhoto', 'notesInternes', 'updatedAt'
+          ])
+        );
+
+      allow delete: if isValidId(laureatId) && isAdmin();
+    }
+
+    // 6. Digit'ELLES Clubs
+    match /clubs/{clubId} {
+      allow get: if isValidId(clubId) && isActiveUser();
+      allow list: if isActiveUser();
+
+      allow create: if isValidId(clubId) && isManager() && isValidClub(incoming()) && incoming().id == clubId;
+      allow update: if isValidId(clubId) && isClubLead() && isValidClub(incoming()) &&
+        incoming().id == existing().id && (
+          isAdmin() ||
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'nom', 'etablissement', 'responsableNom', 'responsableContact', 'description', 'updatedAt'
+          ])
+        );
+      allow delete: if isValidId(clubId) && isAdmin();
+    }
+
+    // 7. Journal d'audit immuable
+    match /activity_logs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(logId) && isClubLead() && isValidActivityLog(incoming()) &&
+        incoming().id == logId &&
+        incoming().timestamp == request.time;
+      allow update, delete: if false;
+    }
+  }
+}

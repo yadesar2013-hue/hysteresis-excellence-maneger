@@ -9,7 +9,28 @@ export type StatutFicheType = 'Active' | 'À vérifier' | 'Archivée';
 export type StatutActuelType = 'Élève' | 'Étudiant(e)' | 'Salarié(e)' | 'Entrepreneur(e)' | 'En recherche' | 'Inconnu';
 export type StatutRelanceType = 'À jour' | 'À relancer' | 'Sans contact' | 'Traité';
 export type RoleClubType = 'Membre' | 'Jeune Instructrice' | 'Déléguée' | 'Responsable';
-export type UserRole = 'admin' | 'manager' | 'club_lead' | 'partner';
+export type UserRole = 'admin' | 'manager' | 'club_lead' | 'partner' | 'pending';
+export type UserStatus = 'active' | 'pending' | 'revoked';
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  status: UserStatus;
+  clubCommune?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RoleInvite {
+  id: string;
+  email: string;
+  role: Exclude<UserRole, 'pending'>;
+  clubCommune?: string;
+  invitedBy: string;
+  createdAt?: string;
+}
 
 export interface ContactItem {
   type: string; // Ex: "Père", "Mère", "Lui-même", "Directrice", "Oncle"
@@ -119,7 +140,7 @@ export interface ActivityLog {
   id: string;
   timestamp: string;
   utilisateur: string;
-  action: 'CREATION' | 'MODIFICATION' | 'SUPPRESSION' | 'IMPORT' | 'EXPORT' | 'FUSION_DOUBLON';
+  action: 'CREATION' | 'MODIFICATION' | 'SUPPRESSION' | 'IMPORT' | 'EXPORT' | 'FUSION_DOUBLON' | 'ADMIN_ROLE';
   entite: string;
   details: string;
 }

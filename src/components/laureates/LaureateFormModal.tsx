@@ -65,6 +65,8 @@ export const LaureateFormModal: React.FC<LaureateFormModalProps> = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successToast, setSuccessToast] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Sauvegarde automatique du brouillon si création
   useEffect(() => {
@@ -92,23 +94,31 @@ export const LaureateFormModal: React.FC<LaureateFormModalProps> = ({
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate() || isSaving) return;
 
-    if (isEditing && initialData) {
-      updateLaureat(initialData.id, formData);
-      setSuccessToast('Fiche mise à jour avec succès !');
-      setTimeout(() => {
-        onSuccess({ ...initialData, ...formData } as Laureat);
-      }, 700);
-    } else {
-      const created = addLaureat(formData as any);
-      localStorage.removeItem(DRAFT_KEY);
-      setSuccessToast('Nouveau lauréat enregistré avec succès !');
-      setTimeout(() => {
-        onSuccess(created);
-      }, 700);
+    setIsSaving(true);
+    setSubmitError('');
+    try {
+      if (isEditing && initialData) {
+        await updateLaureat(initialData.id, formData);
+        setSuccessToast('Fiche mise à jour avec succès !');
+        setTimeout(() => {
+          onSuccess({ ...initialData, ...formData } as Laureat);
+        }, 500);
+      } else {
+        const created = await addLaureat(formData as any);
+        localStorage.removeItem(DRAFT_KEY);
+        setSuccessToast('Nouveau lauréat enregistré avec succès !');
+        setTimeout(() => {
+          onSuccess(created);
+        }, 500);
+      }
+    } catch {
+      setSubmitError("Erreur lors de l'enregistrement dans la base sécurisée. Vérifiez vos droits d'accès.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -150,11 +160,16 @@ export const LaureateFormModal: React.FC<LaureateFormModalProps> = ({
           </button>
         </div>
 
-        {/* Notification Toast de succès */}
+        {/* Notification Toast de succès / erreur */}
         {successToast && (
           <div className="p-3 bg-emerald-50 border-b border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>{successToast}</span>
+          </div>
+        )}
+        {submitError && (
+          <div className="p-3 bg-red-50 border-b border-red-200 text-red-900 text-xs font-semibold">
+            {submitError}
           </div>
         )}
 
@@ -567,10 +582,17 @@ export const LaureateFormModal: React.FC<LaureateFormModalProps> = ({
 
             <button
               type="submit"
-              className="px-5 py-2 bg-[#ED5312] hover:bg-[#D64307] text-white rounded-lg font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+              disabled={isSaving}
+              className="px-5 py-2 bg-[#ED5312] hover:bg-[#D64307] text-white rounded-lg font-bold flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-60"
             >
               <Save className="w-4 h-4" />
-              <span>{isEditing ? 'Enregistrer les modifications' : 'Enregistrer le lauréat'}</span>
+              <span>
+                {isSaving
+                  ? 'Enregistrement...'
+                  : isEditing
+                  ? 'Enregistrer les modifications'
+                  : 'Enregistrer le lauréat'}
+              </span>
             </button>
           </div>
         </form>

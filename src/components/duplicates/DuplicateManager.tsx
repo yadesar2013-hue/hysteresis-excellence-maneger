@@ -13,7 +13,9 @@ interface DuplicateManagerProps {
 }
 
 export const DuplicateManager: React.FC<DuplicateManagerProps> = ({ onSelectLaureat }) => {
-  const { laureats, relierParcours, dissocierParcours, deleteLaureat } = useApp();
+  const { laureats, relierParcours, deleteLaureat, currentRole } = useApp();
+  const canLink = currentRole === 'admin' || currentRole === 'manager';
+  const canDelete = currentRole === 'admin';
 
   const groups = detecterDoublons(laureats);
   const multiExamGroups = groups.filter((g) => g.type === 'PARCOURS_MULTI_EXAMEN');
@@ -94,7 +96,7 @@ export const DuplicateManager: React.FC<DuplicateManagerProps> = ({ onSelectLaur
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                           <span>Parcours Relié & Unifié</span>
                         </span>
-                      ) : (
+                      ) : canLink ? (
                         <button
                           onClick={() => {
                             if (g.items.length >= 2) {
@@ -106,7 +108,7 @@ export const DuplicateManager: React.FC<DuplicateManagerProps> = ({ onSelectLaur
                           <Link2 className="w-3.5 h-3.5" />
                           <span>Relier ces fiches en parcours d’excellence</span>
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
 
@@ -170,12 +172,14 @@ export const DuplicateManager: React.FC<DuplicateManagerProps> = ({ onSelectLaur
               <div key={g.id} className="p-4 bg-red-50/60 border border-red-200 rounded-xl space-y-3">
                 <div className="flex justify-between items-center">
                   <strong className="text-red-900 text-xs">{g.cle}</strong>
-                  <button
-                    onClick={() => deleteLaureat(g.items[1].id, true)}
-                    className="px-3 py-1 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700"
-                  >
-                    Supprimer le doublon secondaire
-                  </button>
+                  {canDelete && (
+                    <button
+                      onClick={() => deleteLaureat(g.items[1].id, true)}
+                      className="px-3 py-1 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700"
+                    >
+                      Supprimer le doublon secondaire
+                    </button>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {g.items.map((item, idx) => (

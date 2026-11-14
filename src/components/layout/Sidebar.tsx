@@ -16,6 +16,7 @@ import {
   BookOpen,
   History,
   ShieldCheck,
+  UserCog,
 } from 'lucide-react';
 
 export type TabKey =
@@ -27,7 +28,8 @@ export type TabKey =
   | 'followup'
   | 'clubs'
   | 'referentiels'
-  | 'logs';
+  | 'logs'
+  | 'users';
 
 interface SidebarProps {
   activeTab: TabKey;
@@ -35,12 +37,13 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
-  const { laureats, clubs, currentRole } = useApp();
+  const { laureats, currentRole, allUsers } = useApp();
 
   // Calculs rapides pour badges réactifs
   const totalLaureats = laureats.length;
   const lauratesARelancer = laureats.filter((l) => l.statutRelance === 'À relancer').length;
   const membresClubs = laureats.filter((l) => l.participationClub).length;
+  const pendingUsersCount = allUsers.filter((u) => u.status === 'pending' || u.role === 'pending').length;
 
   const navItems: {
     key: TabKey;
@@ -78,6 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
       key: 'duplicates',
       label: 'Doublons & Parcours',
       icon: GitMerge,
+      allowedRoles: ['admin', 'manager'],
     },
     {
       key: 'followup',
@@ -98,6 +102,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
       label: 'Référentiels Borgou',
       icon: BookOpen,
       allowedRoles: ['admin', 'manager'],
+    },
+    {
+      key: 'users',
+      label: 'Utilisateurs et rôles',
+      icon: UserCog,
+      badge: pendingUsersCount > 0 ? pendingUsersCount : undefined,
+      badgeColor: 'bg-red-100 text-red-800',
+      allowedRoles: ['admin'],
     },
     {
       key: 'logs',

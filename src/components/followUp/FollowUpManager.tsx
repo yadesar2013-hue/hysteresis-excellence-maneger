@@ -46,9 +46,12 @@ export const FollowUpManager: React.FC<FollowUpManagerProps> = ({ onSelectLaurea
   const aJourCount = laureats.filter((l) => l.statutRelance === 'À jour').length;
   const sansContactCount = laureats.filter((l) => l.statutRelance === 'Sans contact').length;
 
-  const handleSaveFollowUp = (id: string) => {
+  const isAnonymized = currentRole === 'partner' || currentRole === 'club_lead';
+  const canEditFollowUp = currentRole === 'admin' || currentRole === 'manager';
+
+  const handleSaveFollowUp = async (id: string) => {
     const today = new Date().toISOString().split('T')[0];
-    updateLaureat(id, {
+    await updateLaureat(id, {
       statutRelance: newStatus,
       dateDernierContact: today,
       notesInternes: newNote ? `[${today}] : ${newNote}` : undefined,
@@ -200,7 +203,7 @@ export const FollowUpManager: React.FC<FollowUpManagerProps> = ({ onSelectLaurea
                       {laureat.statutRelance}
                     </span>
 
-                    {currentRole !== 'partner' && !isEditingThis && (
+                    {canEditFollowUp && !isEditingThis && (
                       <button
                         onClick={() => {
                           setEditingId(laureat.id);
@@ -218,11 +221,21 @@ export const FollowUpManager: React.FC<FollowUpManagerProps> = ({ onSelectLaurea
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-3 border-t border-slate-100 text-xs">
                   <div className="flex items-center gap-2 text-slate-600">
                     <PhoneCall className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>Contact : <strong className="font-mono text-slate-900">{laureat.telephone || 'Non renseigné'}</strong></span>
+                    <span>
+                      Contact :{' '}
+                      <strong className="font-mono text-slate-900">
+                        {isAnonymized ? 'Confidentiel' : (laureat.telephone || 'Non renseigné')}
+                      </strong>
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-600">
                     <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>Dernier échange : <strong className="text-slate-900">{laureat.dateDernierContact || 'Inconnu'}</strong></span>
+                    <span>
+                      Dernier échange :{' '}
+                      <strong className="text-slate-900">
+                        {isAnonymized ? 'Protégé' : (laureat.dateDernierContact || 'Inconnu')}
+                      </strong>
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-600">
                     <School className="w-3.5 h-3.5 text-slate-400 shrink-0" />

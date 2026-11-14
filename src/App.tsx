@@ -21,7 +21,10 @@ import { DigitEllesManager } from './components/clubs/DigitEllesManager';
 import { ReferentielsView } from './components/settings/ReferentielsView';
 import { ActivityLogsView } from './components/logs/ActivityLogsView';
 import { HelpModal } from './components/help/HelpModal';
+import { LoginView } from './components/auth/LoginView';
+import { UsersRolesView } from './components/users/UsersRolesView';
 import { Laureat, FilterOptions } from './types/laureat';
+import { Loader2, Trash2, X } from 'lucide-react';
 
 const DEFAULT_FILTERS: FilterOptions = {
   searchQuery: '',
@@ -59,7 +62,16 @@ const DEFAULT_COLUMNS = [
 ];
 
 const MainContent: React.FC = () => {
-  const { laureats, deleteLaureat } = useApp();
+  const {
+    authUser,
+    userProfile,
+    authLoading,
+    dataLoading,
+    isSeeding,
+    currentRole,
+    laureats,
+    deleteLaureat,
+  } = useApp();
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
   const [filters, setFilters] = useState<FilterOptions>(DEFAULT_FILTERS);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_COLUMNS);
@@ -69,6 +81,7 @@ const MainContent: React.FC = () => {
   const [editingLaureat, setEditingLaureat] = useState<Laureat | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [archiveTargetId, setArchiveTargetId] = useState<string | null>(null);
 
   // Filtrage réactif des lauréats
   const filteredLaureats = useMemo(() => {
@@ -114,6 +127,26 @@ const MainContent: React.FC = () => {
     });
   }, [laureats, filters]);
 
+  // 1. Chargement initial de la session Firebase
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-slate-600 gap-3">
+        <div className="w-12 h-12 rounded-xl bg-[#ED5312] text-white flex items-center justify-center font-black text-xl shadow-sm">
+          H
+        </div>
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+          <Loader2 className="w-4 h-4 animate-spin text-[#ED5312]" />
+          <span>Vérification sécurisée de votre session...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Barrière d'authentification et de validation du rôle
+  if (!authUser || !userProfile || userProfile.status !== 'active' || currentRole === 'pending') {
+    return <LoginView />;
+  }
+
   const toggleColumn = (key: string) => {
     setVisibleColumns((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
@@ -151,14 +184,29 @@ const MainContent: React.FC = () => {
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col antialiased">
       <Header onOpenHelp={() => setShowHelp(true)} />
 
+      {/* Bandeau d'initialisation ou de chargement Firestore */}
+      {(isSeeding || dataLoading) && (
+        <div className="bg-orange-50 border-b border-orange-200 px-4 py-2 text-xs text-orange-900 flex items-center justify-center gap-2 font-medium">
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-[#ED5312]" />
+          <span>
+            {isSeeding
+              ? 'Initialisation de la base officielle des 111 lauréats (2022–2026) dans Firestore...'
+              : 'Synchronisation sécurisée des données en cours...'}
+          </span>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col lg:flex-row">
-        <Sidebar activeTab={activeTab} onSelectTab={(tab) => {
-          if (tab === 'add') {
-            setIsAddingNew(true);
-          } else {
-            setActiveTab(tab);
-          }
-        }} />
+        <Sidebar
+          activeTab={activeTab}
+          onSelectTab={(tab) => {
+            if (tab === 'add') {
+              setIsAddingNew(true);
+            } else {
+              setActiveTab(tab);
+            }
+          }}
+        />
 
         <main className="flex-1 p-4 lg:p-7 max-w-7xl mx-auto w-full space-y-6">
           {/* VUE 1 : TABLEAU DE BORD */}
@@ -193,24 +241,20 @@ const MainContent: React.FC = () => {
                 visibleColumns={visibleColumns}
                 onSelectLaureat={(laureat) => setSelectedLaureat(laureat)}
                 onEditLaureat={(laureat) => setEditingLaureat(laureat)}
-                onDeleteLaureat={(id) => {
-                  if (window.confirm('Voulez-vous archiver cette fiche de lauréat ?')) {
-                    deleteLaureat(id, false);
-                  }
-                }}
+                onDeleteLaureat={(id) => setArchiveTargetId(id)}
               />
             </div>
           )}
 
           {/* VUE 3 : IMPORTATEUR FICHIER */}
-          {activeTab === 'import' && (
+          {activeTab === 'import' && (currentRole === 'admin' || currentRole === 'manager') && (
             <div className="animate-in fade-in">
               <FileImporter />
             </div>
           )}
 
           {/* VUE 4 : DOUBLONS & TRAJECTOIRES MULTI-EXAMENS */}
-          {activeTab === 'duplicates' && (
+          {activeTab === 'duplicates' && (currentRole === 'admin' || currentRole === 'manager') && (
             <div className="animate-in fade-in">
               <DuplicateManager onSelectLaureat={(laureat) => setSelectedLaureat(laureat)} />
             </div>
@@ -231,14 +275,21 @@ const MainContent: React.FC = () => {
           )}
 
           {/* VUE 7 : RÉFÉRENTIELS BORGOU */}
-          {activeTab === 'referentiels' && (
+          {activeTab === 'referentiels' && (currentRole === 'admin' || currentRole === 'manager') && (
             <div className="animate-in fade-in">
               <ReferentielsView />
             </div>
           )}
 
-          {/* VUE 8 : JOURNAL D'ACTIVITÉS */}
-          {activeTab === 'logs' && (
+          {/* VUE 8 : UTILISATEURS ET RÔLES (ADMIN) */}
+          {activeTab === 'users' && currentRole === 'admin' && (
+            <div className="animate-in fade-in">
+              <UsersRolesView />
+            </div>
+          )}
+
+          {/* VUE 9 : JOURNAL D'ACTIVITÉS */}
+          {activeTab === 'logs' && currentRole === 'admin' && (
             <div className="animate-in fade-in">
               <ActivityLogsView />
             </div>
@@ -285,6 +336,49 @@ const MainContent: React.FC = () => {
 
       {/* MODAL 4 : GUIDE D'UTILISATION */}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+
+      {/* MODAL 5 : CONFIRMATION ARCHIVAGE FICHE */}
+      {archiveTargetId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="flex items-start justify-between">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <button
+                onClick={() => setArchiveTargetId(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <h3 className="text-base font-bold text-slate-900 mt-3">
+              Archiver cette fiche de lauréat ?
+            </h3>
+            <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+              La fiche passera au statut « Archivée » tout en conservant son historique dans Firestore.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setArchiveTargetId(null)}
+                className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async () => {
+                  const target = archiveTargetId;
+                  setArchiveTargetId(null);
+                  await deleteLaureat(target, false);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors shadow-xs"
+              >
+                Confirmer l’archivage
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

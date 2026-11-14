@@ -5,23 +5,24 @@
 
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { History, Download, Upload, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { History, Download, Upload, RefreshCw, CheckCircle2, X } from 'lucide-react';
 
 export const ActivityLogsView: React.FC = () => {
   const { logs, exporterSauvegardeJSON, importerSauvegardeJSON, reinitialiserBase } = useApp();
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const text = evt.target?.result as string;
-        const ok = importerSauvegardeJSON(text);
+        const ok = await importerSauvegardeJSON(text);
         if (ok) {
-          setImportStatus('Sauvegarde restaurée avec succès !');
+          setImportStatus('Sauvegarde restaurée avec succès dans Firestore !');
         } else {
           setImportStatus('Erreur : Fichier JSON invalide.');
         }
@@ -46,7 +47,7 @@ export const ActivityLogsView: React.FC = () => {
           Journal d'Activité & Sauvegardes
         </h2>
         <p className="text-xs text-slate-600 mt-1">
-          Historique exhaustif de toutes les modifications, créations, imports et exports effectués sur la plateforme.
+          Historique exhaustif et immuable de toutes les modifications, créations, attributions de rôles, imports et exports effectués sur la plateforme.
         </p>
 
         {/* Panneau d'actions de sauvegarde */}
@@ -60,7 +61,7 @@ export const ActivityLogsView: React.FC = () => {
             </div>
             <div>
               <strong className="text-slate-900 block font-bold">Exporter Sauvegarde JSON</strong>
-              <span className="text-slate-500 text-[11px]">Télécharge l'intégralité des données locales</span>
+              <span className="text-slate-500 text-[11px]">Télécharge un instantané complet de la base</span>
             </div>
           </button>
 
@@ -81,11 +82,7 @@ export const ActivityLogsView: React.FC = () => {
           </label>
 
           <button
-            onClick={() => {
-              if (window.confirm('Voulez-vous vraiment réinitialiser vers la liste officielle des 111 lauréats ?')) {
-                reinitialiserBase();
-              }
-            }}
+            onClick={() => setShowConfirmReset(true)}
             className="p-3 bg-slate-50 border border-slate-200 hover:border-red-300 rounded-xl text-left flex items-start gap-3 transition-colors shadow-2xs"
           >
             <div className="w-8 h-8 rounded-lg bg-red-100 text-red-700 flex items-center justify-center shrink-0">
@@ -128,6 +125,8 @@ export const ActivityLogsView: React.FC = () => {
                         ? 'bg-red-100 text-red-800'
                         : log.action === 'IMPORT'
                         ? 'bg-purple-100 text-purple-800'
+                        : log.action === 'ADMIN_ROLE'
+                        ? 'bg-amber-100 text-amber-900'
                         : 'bg-orange-100 text-[#ED5312]'
                     }`}
                   >
@@ -148,6 +147,48 @@ export const ActivityLogsView: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Modal de confirmation réinitialisation */}
+      {showConfirmReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="flex items-start justify-between">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                <RefreshCw className="w-5 h-5" />
+              </div>
+              <button
+                onClick={() => setShowConfirmReset(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <h3 className="text-base font-bold text-slate-900 mt-3">
+              Rétablir les 111 lauréats officiels ?
+            </h3>
+            <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+              Cette action réécrira les 111 fiches officielles de la Fondation Hystérésis (2022–2026) dans la base Firestore.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowConfirmReset(false)}
+                className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async () => {
+                  setShowConfirmReset(false);
+                  await reinitialiserBase();
+                }}
+                className="px-4 py-2 text-xs font-semibold text-white bg-[#ED5312] hover:bg-[#D64307] rounded-md transition-colors shadow-xs"
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

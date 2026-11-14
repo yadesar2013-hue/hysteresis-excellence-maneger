@@ -107,83 +107,88 @@ export const FileImporter: React.FC = () => {
     reader.readAsBinaryString(file);
   };
 
-  const handleLaunchImport = () => {
-    if (rawRows.length === 0) return;
+  const handleLaunchImport = async () => {
+    if (rawRows.length === 0 || isProcessing) return;
 
-    const itemsToImport: Partial<Laureat>[] = rawRows.map((row) => {
-      const obj: any = {};
+    setIsProcessing(true);
+    try {
+      const itemsToImport: Partial<Laureat>[] = rawRows.map((row) => {
+        const obj: any = {};
 
-      Object.entries(columnMapping).forEach(([colIdxStr, fieldKey]) => {
-        const colIdx = Number(colIdxStr);
-        const cellVal = row[colIdx];
-        if (cellVal === undefined || cellVal === null) return;
-        const valStr = String(cellVal).trim();
+        Object.entries(columnMapping).forEach(([colIdxStr, fieldKey]) => {
+          const colIdx = Number(colIdxStr);
+          const cellVal = row[colIdx];
+          if (cellVal === undefined || cellVal === null) return;
+          const valStr = String(cellVal).trim();
 
-        if (fieldKey === 'nom_complet') {
-          // Séparer Nom (première partie souvent majuscule) et Prénoms
-          const parts = valStr.split(' ');
-          if (parts.length > 1) {
-            obj.nom = parts[0].toUpperCase();
-            obj.prenoms = parts.slice(1).join(' ');
-          } else {
+          if (fieldKey === 'nom_complet') {
+            // Séparer Nom (première partie souvent majuscule) et Prénoms
+            const parts = valStr.split(' ');
+            if (parts.length > 1) {
+              obj.nom = parts[0].toUpperCase();
+              obj.prenoms = parts.slice(1).join(' ');
+            } else {
+              obj.nom = valStr.toUpperCase();
+              obj.prenoms = '';
+            }
+          } else if (fieldKey === 'nom') {
             obj.nom = valStr.toUpperCase();
-            obj.prenoms = '';
+          } else if (fieldKey === 'prenoms') {
+            obj.prenoms = valStr;
+          } else if (fieldKey === 'sexe') {
+            obj.sexe = valStr.toUpperCase().startsWith('F') ? 'F' : 'M';
+          } else if (fieldKey === 'edition') {
+            obj.edition = parseInt(valStr.replace(/[^0-9]/g, '')) || 2026;
+          } else if (fieldKey === 'examen') {
+            const up = valStr.toUpperCase();
+            if (up.includes('CEP')) obj.examen = 'CEP';
+            else if (up.includes('BEPC')) obj.examen = 'BEPC';
+            else if (up.includes('BAC')) obj.examen = 'BAC';
+            else obj.examen = valStr;
+          } else if (fieldKey === 'commune') {
+            obj.commune = valStr;
+          } else if (fieldKey === 'etablissement') {
+            obj.etablissement = valStr;
+          } else if (fieldKey === 'moyenne') {
+            obj.moyenne = parseFloat(valStr.replace(',', '.')) || 0;
+          } else if (fieldKey === 'rang') {
+            obj.rang = valStr;
+          } else if (fieldKey === 'date_naissance_lieu') {
+            if (valStr.includes(' - ')) {
+              const parts = valStr.split(' - ');
+              obj.dateNaissance = parts[0];
+              obj.lieuNaissance = parts[1].replace(/^(Né|Née)\s+à\s+/i, '');
+            } else {
+              obj.dateNaissance = valStr;
+            }
+          } else if (fieldKey === 'autres') {
+            obj.remarquesScolaires = valStr;
+            if (valStr.includes('Série')) {
+              const matchSerie = valStr.match(/Série\s+[A-Z0-9]+/i);
+              if (matchSerie) obj.serie = matchSerie[0];
+            }
+            if (valStr.includes('Mention')) {
+              const matchMention = valStr.match(/Mention\s+[A-Za-z\s]+/i);
+              if (matchMention) obj.mention = matchMention[0];
+            }
+          } else if (fieldKey === 'contacts') {
+            obj.telephone = valStr;
           }
-        } else if (fieldKey === 'nom') {
-          obj.nom = valStr.toUpperCase();
-        } else if (fieldKey === 'prenoms') {
-          obj.prenoms = valStr;
-        } else if (fieldKey === 'sexe') {
-          obj.sexe = valStr.toUpperCase().startsWith('F') ? 'F' : 'M';
-        } else if (fieldKey === 'edition') {
-          obj.edition = parseInt(valStr.replace(/[^0-9]/g, '')) || 2026;
-        } else if (fieldKey === 'examen') {
-          const up = valStr.toUpperCase();
-          if (up.includes('CEP')) obj.examen = 'CEP';
-          else if (up.includes('BEPC')) obj.examen = 'BEPC';
-          else if (up.includes('BAC')) obj.examen = 'BAC';
-          else obj.examen = valStr;
-        } else if (fieldKey === 'commune') {
-          obj.commune = valStr;
-        } else if (fieldKey === 'etablissement') {
-          obj.etablissement = valStr;
-        } else if (fieldKey === 'moyenne') {
-          obj.moyenne = parseFloat(valStr.replace(',', '.')) || 0;
-        } else if (fieldKey === 'rang') {
-          obj.rang = valStr;
-        } else if (fieldKey === 'date_naissance_lieu') {
-          if (valStr.includes(' - ')) {
-            const parts = valStr.split(' - ');
-            obj.dateNaissance = parts[0];
-            obj.lieuNaissance = parts[1].replace(/^(Né|Née)\s+à\s+/i, '');
-          } else {
-            obj.dateNaissance = valStr;
-          }
-        } else if (fieldKey === 'autres') {
-          obj.remarquesScolaires = valStr;
-          if (valStr.includes('Série')) {
-            const matchSerie = valStr.match(/Série\s+[A-Z0-9]+/i);
-            if (matchSerie) obj.serie = matchSerie[0];
-          }
-          if (valStr.includes('Mention')) {
-            const matchMention = valStr.match(/Mention\s+[A-Za-z\s]+/i);
-            if (matchMention) obj.mention = matchMention[0];
-          }
-        } else if (fieldKey === 'contacts') {
-          obj.telephone = valStr;
-        }
+        });
+
+        // Valeurs par défaut indispensables
+        if (!obj.departement) obj.departement = 'Borgou';
+        if (!obj.typeEtablissement) obj.typeEtablissement = 'Public';
+        if (obj.moyenne >= 16) obj.ordinateurRecu = true;
+
+        return obj;
       });
 
-      // Valeurs par défaut indispensables
-      if (!obj.departement) obj.departement = 'Borgou';
-      if (!obj.typeEtablissement) obj.typeEtablissement = 'Public';
-      if (obj.moyenne >= 16) obj.ordinateurRecu = true;
-
-      return obj;
-    });
-
-    const res = batchImportLaureats(itemsToImport, importMode);
-    setReport(res);
+      const res = await batchImportLaureats(itemsToImport, importMode);
+      setReport(res);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDownloadTemplate = () => {
@@ -366,10 +371,15 @@ export const FileImporter: React.FC = () => {
           <div className="pt-4 border-t border-slate-200 flex justify-end">
             <button
               onClick={handleLaunchImport}
-              className="px-6 py-2.5 bg-[#ED5312] hover:bg-[#D64307] text-white font-bold rounded-lg text-xs flex items-center gap-2 shadow-sm transition-colors"
+              disabled={isProcessing}
+              className="px-6 py-2.5 bg-[#ED5312] hover:bg-[#D64307] text-white font-bold rounded-lg text-xs flex items-center gap-2 shadow-sm transition-colors disabled:opacity-60"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Valider et importer les {rawRows.length} lignes</span>
+              <span>
+                {isProcessing
+                  ? 'Importation sécurisée en cours...'
+                  : `Valider et importer les ${rawRows.length} lignes`}
+              </span>
             </button>
           </div>
         </div>

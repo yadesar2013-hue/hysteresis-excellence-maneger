@@ -1,0 +1,536 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Profil utilisateur et habilitation d'accès (RBAC) stocké côté serveur.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Identifiant Firebase Auth unique",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Adresse e-mail vérifiée de l'utilisateur",
+          "maxLength": 200
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Nom complet affiché",
+          "maxLength": 150
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "manager", "club_lead", "partner", "pending"],
+          "description": "Rôle attribué par l'administrateur"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "pending", "revoked"],
+          "description": "Statut d'activation du compte"
+        },
+        "clubCommune": {
+          "type": "string",
+          "description": "Commune rattachée pour un responsable de club",
+          "maxLength": 80
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Horodatage serveur de création"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Horodatage serveur de mise à jour"
+        }
+      },
+      "required": ["uid", "email", "displayName", "role", "status", "createdAt", "updatedAt"]
+    },
+    "RoleInvite": {
+      "title": "RoleInvite",
+      "description": "Invitation nominative pré-approuvée par l'administrateur associant un e-mail à un rôle.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 200
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "manager", "club_lead", "partner"]
+        },
+        "clubCommune": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "invitedBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["email", "role", "invitedBy", "createdAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Registre sécurisé des administrateurs autorisés.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 200
+        },
+        "grantedBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "grantedBy", "createdAt"]
+    },
+    "LaureatStats": {
+      "title": "LaureatStats",
+      "description": "Données scolaires et statistiques anonymisées d'un lauréat (sans données personnelles identifiantes).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "numeroOrigine": {
+          "type": "integer"
+        },
+        "initiales": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "sexe": {
+          "type": "string",
+          "enum": ["F", "M"]
+        },
+        "edition": {
+          "type": "integer"
+        },
+        "examen": {
+          "type": "string",
+          "enum": ["CEP", "BEPC", "BAC", "Autre"]
+        },
+        "commune": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "departement": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "etablissement": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "typeEtablissement": {
+          "type": "string",
+          "enum": ["Public", "Privé", "Militaire"]
+        },
+        "moyenne": {
+          "type": "number"
+        },
+        "rang": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "serie": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "mention": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "moyenneEntreeSixieme": {
+          "type": "number"
+        },
+        "ordinateurRecu": {
+          "type": "boolean"
+        },
+        "tabletteRecue": {
+          "type": "boolean"
+        },
+        "bourseRecue": {
+          "type": "boolean"
+        },
+        "statutActuel": {
+          "type": "string",
+          "enum": ["Élève", "Étudiant(e)", "Salarié(e)", "Entrepreneur(e)", "En recherche", "Inconnu"]
+        },
+        "orientationStem": {
+          "type": "string",
+          "enum": ["Oui", "Non", "Inconnue"]
+        },
+        "participationClub": {
+          "type": "boolean"
+        },
+        "clubCommune": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "clubNiveau": {
+          "type": "string",
+          "enum": ["3ème", "Seconde", "Première", "Terminale"]
+        },
+        "roleClub": {
+          "type": "string",
+          "enum": ["Membre", "Jeune Instructrice", "Déléguée", "Responsable"]
+        },
+        "statutRelance": {
+          "type": "string",
+          "enum": ["À jour", "À relancer", "Sans contact", "Traité"]
+        },
+        "statutFiche": {
+          "type": "string",
+          "enum": ["Active", "À vérifier", "Archivée"]
+        },
+        "tauxCompletude": {
+          "type": "integer"
+        },
+        "parcoursLiesIds": {
+          "type": "array"
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "sexe", "edition", "examen", "commune", "departement", "etablissement", "typeEtablissement", "moyenne", "rang", "ordinateurRecu", "tabletteRecue", "bourseRecue", "statutActuel", "orientationStem", "participationClub", "statutRelance", "statutFiche", "tauxCompletude", "createdBy", "createdAt", "updatedAt"]
+    },
+    "LaureatPrivate": {
+      "title": "LaureatPrivate",
+      "description": "Données personnelles identifiantes (PII) et notes confidentielles d'un lauréat, strictement réservées aux administrateurs et gestionnaires autorisés.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "nom": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "prenoms": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "dateNaissance": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "lieuNaissance": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "photoUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "telephone": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "telephoneLibelle": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "contactsSecondaires": {
+          "type": "array"
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "contactUrgence": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "arrondissement": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "numeroTable": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "remarquesScolaires": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "certificatReference": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "naturePrix": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "accompagnementRecu": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "dateRemise": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "lieuRemise": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "partenaireAssocie": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "observationRecompense": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "etablissementActuel": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "filiereActuelle": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "communeActuelle": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "dateDernierContact": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "motifRelance": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "prochaineAction": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "responsableSuivi": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "mentorAttribue": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "derniereActiviteSuivie": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "besoinsActuels": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "projetProfessionnel": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "difficultesRencontrees": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "commentairesSuivi": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "clubEtablissement": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "projetsRealises": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "participationHackathon": {
+          "type": "boolean"
+        },
+        "sourceInformation": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "consentementDonnees": {
+          "type": "boolean"
+        },
+        "autorisationPublicationPhoto": {
+          "type": "boolean"
+        },
+        "notesInternes": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "nom", "prenoms", "consentementDonnees", "autorisationPublicationPhoto", "sourceInformation", "createdBy", "createdAt", "updatedAt"]
+    },
+    "DigitEllesClub": {
+      "title": "DigitEllesClub",
+      "description": "Club Digit'ELLES communal avec capacité maximale de 12 membres.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "nom": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 150
+        },
+        "commune": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "etablissement": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "anneeCreation": {
+          "type": "integer"
+        },
+        "responsableNom": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "responsableContact": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "capaciteMax": {
+          "type": "integer"
+        },
+        "maxParNiveau": {
+          "type": "integer"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "required": ["id", "nom", "commune", "etablissement", "anneeCreation", "capaciteMax", "maxParNiveau"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Journal d'audit des actions administratives et modifications de fiches.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "utilisateur": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "action": {
+          "type": "string",
+          "enum": ["CREATION", "MODIFICATION", "SUPPRESSION", "IMPORT", "EXPORT", "FUSION_DOUBLON", "ADMIN_ROLE"]
+        },
+        "entite": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "required": ["id", "timestamp", "utilisateur", "userId", "action", "entite", "details"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Profils utilisateurs et rôles assignés"
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Liste de contrôle des administrateurs"
+    },
+    "/role_invites/{inviteId}": {
+      "schema": { "$ref": "#/entities/RoleInvite" },
+      "description": "Invitations pré-approuvées par e-mail"
+    },
+    "/laureats_stats/{laureatId}": {
+      "schema": { "$ref": "#/entities/LaureatStats" },
+      "description": "Données scolaires et statistiques anonymisées des lauréats"
+    },
+    "/laureats_private/{laureatId}": {
+      "schema": { "$ref": "#/entities/LaureatPrivate" },
+      "description": "Données personnelles sensibles (PII) isolées et protégées"
+    },
+    "/clubs/{clubId}": {
+      "schema": { "$ref": "#/entities/DigitEllesClub" },
+      "description": "Référentiel des Digit'ELLES Clubs"
+    },
+    "/activity_logs/{logId}": {
+      "schema": { "$ref": "#/entities/ActivityLog" },
+      "description": "Journal d'audit immuable des opérations"
+    }
+  }
+}

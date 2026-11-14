@@ -46,7 +46,8 @@ export const LaureateTable: React.FC<LaureateTableProps> = ({
   const [sortAsc, setSortAsc] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  const isAnonymized = currentRole === 'partner';
+  const isAnonymized = currentRole === 'partner' || currentRole === 'club_lead';
+  const canEditFiches = currentRole === 'admin' || currentRole === 'manager';
 
   // Tri
   const sortedLaureats = useMemo(() => {
@@ -501,7 +502,7 @@ export const LaureateTable: React.FC<LaureateTableProps> = ({
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
-                        {currentRole !== 'partner' && (
+                        {canEditFiches && (
                           <button
                             onClick={() => onEditLaureat(laureat)}
                             className="p-1 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"

@@ -44,7 +44,9 @@ export const LaureateDetailModal: React.FC<LaureateDetailModalProps> = ({
   const [activeTab, setActiveTab] = useState<number>(1);
   const [newNote, setNewNote] = useState('');
 
-  const isAnonymized = currentRole === 'partner';
+  const isAnonymized = currentRole === 'partner' || currentRole === 'club_lead';
+  const canManageFiches = currentRole === 'admin' || currentRole === 'manager';
+  const canEditClub = currentRole === 'admin' || currentRole === 'manager' || currentRole === 'club_lead';
   const completude = calculerCompletude(laureat);
 
   // Recherche des distinctions liées (parcours multi-examens)
@@ -52,13 +54,13 @@ export const LaureateDetailModal: React.FC<LaureateDetailModalProps> = ({
     .map((id) => laureats.find((l) => l.id === id))
     .filter(Boolean) as Laureat[];
 
-  const handleAddNote = () => {
-    if (!newNote.trim()) return;
+  const handleAddNote = async () => {
+    if (!newNote.trim() || !canManageFiches) return;
     const dateStr = new Date().toLocaleDateString('fr-FR');
     const updatedNotes = laureat.notesInternes
       ? `${laureat.notesInternes}\n[${dateStr} - ${currentRole}] : ${newNote}`
       : `[${dateStr} - ${currentRole}] : ${newNote}`;
-    updateLaureat(laureat.id, { notesInternes: updatedNotes });
+    await updateLaureat(laureat.id, { notesInternes: updatedNotes });
     setNewNote('');
   };
 
@@ -132,7 +134,7 @@ export const LaureateDetailModal: React.FC<LaureateDetailModalProps> = ({
                 <span className="hidden sm:inline">Imprimer</span>
               </button>
 
-              {currentRole !== 'partner' && (
+              {canManageFiches && (
                 <button
                   onClick={() => onEdit(laureat)}
                   className="p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
@@ -535,7 +537,7 @@ export const LaureateDetailModal: React.FC<LaureateDetailModalProps> = ({
               ) : (
                 <div className="p-4 bg-white rounded-lg border border-slate-200 text-center space-y-2">
                   <p className="text-slate-600">Ce lauréat n’est actuellement pas rattaché à un Digit'ELLES Club.</p>
-                  {laureat.sexe === 'F' && currentRole !== 'partner' && (
+                  {laureat.sexe === 'F' && canEditClub && (
                     <button
                       onClick={() => {
                         updateLaureat(laureat.id, {
@@ -639,7 +641,7 @@ export const LaureateDetailModal: React.FC<LaureateDetailModalProps> = ({
                   <p className="text-slate-500 italic">Aucune note enregistrée pour l’instant.</p>
                 )}
 
-                {currentRole !== 'partner' && (
+                {canManageFiches && (
                   <div className="pt-2 flex gap-2">
                     <input
                       type="text"
